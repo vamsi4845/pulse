@@ -10,8 +10,13 @@ export const uploadVideo = asyncHandler(async (req, res, next) => {
     return next(new AppError('No file uploaded', 400));
   }
 
-  const { userId, organizationId } = req.user;
+  const userId = req.user._id;
+  const organizationId = req.user.organizationId;
   const { s3Key, s3Bucket } = req;
+
+  if (!userId || !organizationId) {
+    return next(new AppError('User information is incomplete', 400));
+  }
 
   const video = await Video.create({
     filename: req.file.originalname,

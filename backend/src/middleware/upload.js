@@ -34,7 +34,13 @@ export async function uploadToS3Middleware(req, res, next) {
   }
 
   try {
-    const { userId, organizationId } = req.user;
+    const userId = req.user._id;
+    const organizationId = req.user.organizationId;
+    
+    if (!userId || !organizationId) {
+      return next(new Error('User information is incomplete'));
+    }
+
     const s3Key = generateS3Key(userId, organizationId, req.file.originalname);
 
     await uploadToS3(s3Key, req.file.buffer, req.file.mimetype);
