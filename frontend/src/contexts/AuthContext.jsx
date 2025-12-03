@@ -8,56 +8,82 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    
-    if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
-      verifyToken();
-    } else {
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      
+      if (token && storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+          await verifyToken();
+        } catch (error) {
+          console.error('Token verification failed:', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+        }
+      }
       setLoading(false);
-    }
+    };
+
+    initializeAuth();
   }, []);
 
   const verifyToken = async () => {
     try {
       const response = await api.get('/auth/me');
-      setUser(response.data.data.user);
-      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      const userData = response.data.data.user;
+      const normalizedUser = {
+        id: userData._id || userData.id,
+        email: userData.email,
+        role: userData.role,
+        organizationId: userData.organizationId?._id || userData.organizationId,
+      };
+      setUser(normalizedUser);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      return normalizedUser;
     } catch (error) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setUser(null);
-    } finally {
-      setLoading(false);
+      throw error;
     }
   };
 
   const login = async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
-    const { user: userData, token } = response.data.data;
-    
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
-    
-    return { user: userData, token };
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      const { user: userData, token } = response.data.data;
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+      setLoading(false);
+      
+      return { user: userData, token };
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
   };
 
   const register = async (email, password, role, organizationName) => {
-    const response = await api.post('/auth/register', {
-      email,
-      password,
-      role,
-      organizationName,
-    });
-    const { user: userData, token } = response.data.data;
-    
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
-    
-    return { user: userData, token };
+    try {
+      const response = await api.post('/auth/register', {
+        email,
+        password,
+        role,
+        organizationName,
+      });
+      const { user: userData, token } = response.data.data;
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+      setLoading(false);
+      
+      return { user: userData, token };
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw error;
+    }
   };
 
   const logout = () => {
