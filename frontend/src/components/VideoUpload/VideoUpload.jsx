@@ -2,6 +2,8 @@ import { useState, useRef, useCallback } from 'react';
 import { useSocket } from '../../contexts/SocketContext.jsx';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import api from '../../services/api.js';
+import { UploadCloud, FileVideo, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { cn } from '../../lib/utils.js';
 
 export function VideoUpload() {
   const [dragActive, setDragActive] = useState(false);
@@ -43,12 +45,12 @@ export function VideoUpload() {
 
   const handleFile = async (file) => {
     if (!file.type.startsWith('video/')) {
-      setError('Please select a video file');
+      setError('Please select a valid video file');
       return;
     }
 
-    if (file.size > 500 * 1024 * 1024) {
-      setError('File size must be less than 500MB');
+    if (file.size > 50 * 1024 * 1024) {
+      setError('File size must be less than 50MB');
       return;
     }
 
@@ -78,17 +80,23 @@ export function VideoUpload() {
       setCurrentVideoId(videoId);
 
       if (socket) {
-        socket.on('video:processing', (data) => {
+        const processingHandler = (data) => {
           if (data.videoId === videoId) {
             setProcessingProgress(data.progress);
           }
-        });
+        };
 
-        socket.on('video:completed', (data) => {
+        const completedHandler = (data) => {
           if (data.videoId === videoId) {
             setUploading(false);
             setSuccess('Video uploaded and processed successfully!');
             setProcessingProgress(100);
+            
+            // Clean up listeners
+            socket.off('video:processing', processingHandler);
+            socket.off('video:completed', completedHandler);
+            socket.off('video:failed', failedHandler);
+
             setTimeout(() => {
               setSuccess('');
               setUploadProgress(0);
@@ -96,17 +104,26 @@ export function VideoUpload() {
               setCurrentVideoId(null);
             }, 3000);
           }
-        });
+        };
 
-        socket.on('video:failed', (data) => {
+        const failedHandler = (data) => {
           if (data.videoId === videoId) {
             setUploading(false);
             setError('Video processing failed');
             setUploadProgress(0);
             setProcessingProgress(0);
             setCurrentVideoId(null);
+            
+            // Clean up listeners
+            socket.off('video:processing', processingHandler);
+            socket.off('video:completed', completedHandler);
+            socket.off('video:failed', failedHandler);
           }
-        });
+        };
+
+        socket.on('video:processing', processingHandler);
+        socket.on('video:completed', completedHandler);
+        socket.on('video:failed', failedHandler);
       }
     } catch (err) {
       setUploading(false);
@@ -117,105 +134,111 @@ export function VideoUpload() {
   };
 
   if (!user || (user.role !== 'editor' && user.role !== 'admin')) {
-    return (
-      <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded">
-        You don't have permission to upload videos. Editor or Admin role required.
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="bg-white shadow rounded-lg p-6">
-      <h2 className="text-xl font-semibold mb-4">Upload Video</h2>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="p-6">
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-lg flex items-center gap-3 text-red-700">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <p className="text-sm font-medium">{error}</p>
+          </div>
+        )}
 
-      {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
-          {success}
-        </div>
-      )}
-
-      <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center ${
-          dragActive
-            ? 'border-indigo-500 bg-indigo-50'
-            : 'border-gray-300 hover:border-gray-400'
-        }`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="video/*"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-lg flex items-center gap-3 text-green-700">
+            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+            <p className="text-sm font-medium">{success}</p>
+          </div>
+        )}
 
         {!uploading ? (
-          <>
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              stroke="currentColor"
-              fill="none"
-              viewBox="0 0 48 48"
-            >
-              <path
-                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <p className="mt-2 text-sm text-gray-600">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="font-medium text-indigo-600 hover:text-indigo-500"
-              >
-                Click to upload
-              </button>
-              {' or drag and drop'}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">Video files up to 500MB</p>
-          </>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">
-                Uploading: {uploadProgress}%
-              </p>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div
-                  className="bg-indigo-600 h-2.5 rounded-full transition-all"
-                  style={{ width: `${uploadProgress}%` }}
-                />
+          <div
+            className={cn(
+              "relative border-2 border-dashed rounded-xl p-12 transition-all duration-200 ease-in-out text-center cursor-pointer group",
+              dragActive
+                ? "border-indigo-500 bg-indigo-50/50"
+                : "border-gray-200 hover:border-indigo-400 hover:bg-gray-50"
+            )}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            
+            <div className="flex flex-col items-center gap-4">
+              <div className={cn(
+                "p-4 rounded-full transition-colors",
+                dragActive ? "bg-indigo-100 text-indigo-600" : "bg-gray-100 text-gray-500 group-hover:bg-indigo-50 group-hover:text-indigo-600"
+              )}>
+                <UploadCloud className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-gray-900">
+                  Click to upload or drag and drop
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  MP4, WebM or Ogg (max. 50MB)
+                </p>
               </div>
             </div>
-            {uploadProgress === 100 && (
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">
-                  Processing: {processingProgress}%
-                </p>
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div
-                    className="bg-green-600 h-2.5 rounded-full transition-all"
-                    style={{ width: `${processingProgress}%` }}
+          </div>
+        ) : (
+          <div className="space-y-6 py-8">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mb-4 relative">
+                 <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {uploadProgress < 100 ? 'Uploading Video...' : 'Processing Video...'}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Please don't close this page
+              </p>
+            </div>
+
+            <div className="space-y-4 max-w-md mx-auto">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 font-medium">Upload</span>
+                  <span className="text-gray-900 font-bold">{uploadProgress}%</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-indigo-600 transition-all duration-300 ease-out rounded-full"
+                    style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
               </div>
-            )}
+
+              {uploadProgress === 100 && (
+                 <div className="space-y-2">
+                   <div className="flex justify-between text-sm">
+                     <span className="text-gray-600 font-medium">Processing</span>
+                     <span className="text-gray-900 font-bold">{processingProgress}%</span>
+                   </div>
+                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                     <div 
+                       className="h-full bg-green-500 transition-all duration-300 ease-out rounded-full"
+                       style={{ width: `${processingProgress}%` }}
+                     />
+                   </div>
+                 </div>
+              )}
+            </div>
           </div>
         )}
       </div>
     </div>
   );
 }
-

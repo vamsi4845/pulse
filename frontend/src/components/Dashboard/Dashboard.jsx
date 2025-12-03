@@ -3,8 +3,34 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useSocket } from '../../contexts/SocketContext.jsx';
 import { VideoUpload } from '../VideoUpload/VideoUpload.jsx';
 import { VideoLibrary } from '../VideoLibrary/VideoLibrary.jsx';
-import { Link } from 'react-router-dom';
 import api from '../../services/api.js';
+import { 
+  LayoutDashboard, 
+  Activity, 
+  CheckCircle, 
+  AlertTriangle, 
+  LogOut,
+  Wifi,
+  WifiOff,
+  User
+} from 'lucide-react';
+import { cn } from '../../lib/utils.js';
+
+function StatsCard({ title, value, icon: Icon, className, iconColor }) {
+  return (
+    <div className={cn("bg-white rounded-xl border border-gray-100 p-6 shadow-sm transition-all hover:shadow-md", className)}>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">{title}</p>
+          <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+        </div>
+        <div className={cn("p-3 rounded-full bg-opacity-10", iconColor)}>
+          <Icon className={cn("w-6 h-6", iconColor.replace('bg-', 'text-'))} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function Dashboard() {
   const { user, logout } = useAuth();
@@ -22,17 +48,12 @@ export function Dashboard() {
 
   useEffect(() => {
     if (socket) {
-      socket.on('video:processing', () => {
-        fetchStats();
-      });
-
-      socket.on('video:completed', () => {
-        fetchStats();
-      });
+      socket.on('video:processing', fetchStats);
+      socket.on('video:completed', fetchStats);
 
       return () => {
-        socket.off('video:processing');
-        socket.off('video:completed');
+        socket.off('video:processing', fetchStats);
+        socket.off('video:completed', fetchStats);
       };
     }
   }, [socket]);
@@ -59,128 +80,100 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
+    <div className="min-h-screen bg-gray-50/50">
+      {/* Top Navigation */}
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold">Video Processing App</h1>
+            <div className="flex items-center gap-3">
+              <div className="bg-indigo-600 p-2 rounded-lg">
+                <LayoutDashboard className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Pulse Video</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    connected ? 'bg-green-500' : 'bg-red-500'
-                  }`}
-                />
-                <span className="text-sm text-gray-600">
-                  {connected ? 'Connected' : 'Disconnected'}
+            
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200">
+                {connected ? (
+                  <Wifi className="w-4 h-4 text-green-500" />
+                ) : (
+                  <WifiOff className="w-4 h-4 text-red-500" />
+                )}
+                <span className={cn("text-xs font-medium", connected ? "text-green-700" : "text-red-700")}>
+                  {connected ? 'System Online' : 'Disconnected'}
                 </span>
               </div>
-              <div className="text-sm text-gray-700">
-                {user?.email} ({user?.role})
+
+              <div className="h-6 w-px bg-gray-200" />
+
+              <div className="flex items-center gap-4">
+                <div className="text-right hidden sm:block">
+                  <div className="text-sm font-medium text-gray-900">{user?.email}</div>
+                  <div className="text-xs text-gray-500 capitalize">{user?.role}</div>
+                </div>
+                <div className="bg-gray-100 p-2 rounded-full">
+                  <User className="w-5 h-5 text-gray-600" />
+                </div>
+                <button
+                  onClick={logout}
+                  className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Logout"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                onClick={logout}
-                className="px-4 py-2 text-sm text-white bg-indigo-600 rounded hover:bg-indigo-700"
-              >
-                Logout
-              </button>
             </div>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="text-2xl font-bold text-gray-900">
-                      {stats.total}
-                    </div>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Total Videos
-                      </dt>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <StatsCard 
+            title="Total Videos" 
+            value={stats.total} 
+            icon={LayoutDashboard}
+            iconColor="bg-gray-100 text-gray-600"
+          />
+          <StatsCard 
+            title="Processing" 
+            value={stats.processing} 
+            icon={Activity}
+            iconColor="bg-blue-100 text-blue-600"
+          />
+          <StatsCard 
+            title="Completed" 
+            value={stats.completed} 
+            icon={CheckCircle}
+            iconColor="bg-green-100 text-green-600"
+          />
+          <StatsCard 
+            title="Flagged Content" 
+            value={stats.flagged} 
+            icon={AlertTriangle}
+            iconColor="bg-red-100 text-red-600"
+          />
+        </div>
 
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {stats.processing}
-                    </div>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Processing
-                      </dt>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="text-2xl font-bold text-green-600">
-                      {stats.completed}
-                    </div>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Completed
-                      </dt>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="text-2xl font-bold text-red-600">
-                      {stats.flagged}
-                    </div>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Flagged
-                      </dt>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
+        <div className="space-y-8">
           {(user?.role === 'editor' || user?.role === 'admin') && (
-            <div className="mb-6">
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Upload New Content</h2>
+              </div>
               <VideoUpload />
-            </div>
+            </section>
           )}
 
-          <VideoLibrary />
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Recent Videos</h2>
+            </div>
+            <VideoLibrary />
+          </section>
         </div>
       </main>
     </div>
   );
 }
-
