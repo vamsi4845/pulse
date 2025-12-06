@@ -34,6 +34,13 @@ export const register = asyncHandler(async (req, res, next) => {
 
   const token = generateToken(user._id);
 
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  });
+
   res.status(201).json({
     success: true,
     data: {
@@ -43,7 +50,6 @@ export const register = asyncHandler(async (req, res, next) => {
         role: user.role,
         organizationId: user.organizationId,
       },
-      token,
     },
   });
 });
@@ -62,6 +68,13 @@ export const login = asyncHandler(async (req, res, next) => {
 
   const token = generateToken(user._id);
 
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  });
+
   res.json({
     success: true,
     data: {
@@ -71,7 +84,6 @@ export const login = asyncHandler(async (req, res, next) => {
         role: user.role,
         organizationId: user.organizationId,
       },
-      token,
     },
   });
 });
@@ -84,6 +96,20 @@ export const getMe = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: { user },
+  });
+});
+
+export const logout = asyncHandler(async (req, res) => {
+  res.cookie('token', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 0,
+  });
+
+  res.json({
+    success: true,
+    message: 'Logged out successfully',
   });
 });
 

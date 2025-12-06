@@ -9,17 +9,21 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const initializeAuth = async () => {
-      const token = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
       
-      if (token && storedUser) {
+      if (storedUser) {
         try {
           setUser(JSON.parse(storedUser));
           await verifyToken();
         } catch (error) {
           console.error('Token verification failed:', error);
-          localStorage.removeItem('token');
           localStorage.removeItem('user');
+          setUser(null);
+        }
+      } else {
+        try {
+          await verifyToken();
+        } catch (error) {
           setUser(null);
         }
       }
@@ -50,14 +54,20 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-      const { user: userData, token } = response.data.data;
+      const { user: userData } = response.data.data;
       
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
+      const normalizedUser = {
+        id: userData.id || userData._id,
+        email: userData.email,
+        role: userData.role,
+        organizationId: userData.organizationId?._id || userData.organizationId,
+      };
+      
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      setUser(normalizedUser);
       setLoading(false);
       
-      return { user: userData, token };
+      return { user: normalizedUser };
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
@@ -72,24 +82,35 @@ export function AuthProvider({ children }) {
         role,
         organizationName,
       });
-      const { user: userData, token } = response.data.data;
+      const { user: userData } = response.data.data;
       
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
+      const normalizedUser = {
+        id: userData.id || userData._id,
+        email: userData.email,
+        role: userData.role,
+        organizationId: userData.organizationId?._id || userData.organizationId,
+      };
+      
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      setUser(normalizedUser);
       setLoading(false);
       
-      return { user: userData, token };
+      return { user: normalizedUser };
     } catch (error) {
       console.error('Registration failed:', error);
       throw error;
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('user');
+      setUser(null);
+    }
   };
 
   const value = {

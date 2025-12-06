@@ -12,9 +12,7 @@ export function SocketProvider({ children }) {
 
   useEffect(() => {
     if (isAuthenticated && user && !socketRef.current) {
-      const token = localStorage.getItem('token');
       const newSocket = createSocket(
-        token,
         user.id,
         user.organizationId
       );

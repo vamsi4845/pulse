@@ -1,25 +1,14 @@
 import axios from 'axios';
 import { API_URL } from '../utils/constants.js';
+import { deleteCookie } from '../lib/utils.js';
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
-
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
 
 api.interceptors.response.use(
   (response) => response,
@@ -27,8 +16,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && currentPath !== '/register') {
-        localStorage.removeItem('token');
         localStorage.removeItem('user');
+        deleteCookie('token');
         window.location.href = '/login';
       }
     }

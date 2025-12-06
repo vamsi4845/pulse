@@ -1,6 +1,6 @@
 import express from 'express';
 import { body } from 'express-validator';
-import { register, login, getMe } from '../controllers/authController.js';
+import { register, login, getMe, logout } from '../controllers/authController.js';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 
@@ -19,6 +19,7 @@ const validateLogin = [
 
 router.post('/register', validateRegister, asyncHandler(register));
 router.post('/login', validateLogin, asyncHandler(login));
+router.post('/logout', authenticate, asyncHandler(logout));
 router.get('/me', authenticate, asyncHandler(getMe));
 
 export default router;
