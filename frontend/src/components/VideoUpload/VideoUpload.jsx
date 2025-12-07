@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSocket } from '../../contexts/SocketContext.jsx';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import api from '../../services/api.js';
@@ -14,8 +15,10 @@ export function VideoUpload() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const fileInputRef = useRef(null);
-  const { socket } = useSocket();
+  const pollingIntervalRef = useRef(null);
+  const { socket, connected } = useSocket();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const handleDrag = useCallback((e) => {
     e.preventDefault();
@@ -79,7 +82,48 @@ export function VideoUpload() {
       const videoId = response.data.data.video._id;
       setCurrentVideoId(videoId);
 
-      if (socket) {
+      const cleanup = () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      };
+
+      const checkVideoStatus = async () => {
+        try {
+          const statusResponse = await api.get(`/videos/${videoId}`);
+          const video = statusResponse.data.data.video;
+          
+          if (video.processingProgress !== undefined) {
+            setProcessingProgress(video.processingProgress);
+          }
+          
+          if (video.status === 'completed') {
+            cleanup();
+            setUploading(false);
+            setSuccess('Video uploaded and processed successfully!');
+            setProcessingProgress(100);
+            queryClient.invalidateQueries({ queryKey: ['videos'] });
+            setTimeout(() => {
+              setSuccess('');
+              setUploadProgress(0);
+              setProcessingProgress(0);
+              setCurrentVideoId(null);
+            }, 3000);
+          } else if (video.status === 'failed') {
+            cleanup();
+            setUploading(false);
+            setError('Video processing failed');
+            setUploadProgress(0);
+            setProcessingProgress(0);
+            setCurrentVideoId(null);
+          }
+        } catch (err) {
+          console.error('Error checking video status:', err);
+        }
+      };
+
+      if (socket && connected) {
         const processingHandler = (data) => {
           if (data.videoId === videoId) {
             setProcessingProgress(data.progress);
@@ -88,11 +132,12 @@ export function VideoUpload() {
 
         const completedHandler = (data) => {
           if (data.videoId === videoId) {
+            cleanup();
             setUploading(false);
             setSuccess('Video uploaded and processed successfully!');
             setProcessingProgress(100);
+            queryClient.invalidateQueries({ queryKey: ['videos'] });
             
-            // Clean up listeners
             socket.off('video:processing', processingHandler);
             socket.off('video:completed', completedHandler);
             socket.off('video:failed', failedHandler);
@@ -108,13 +153,13 @@ export function VideoUpload() {
 
         const failedHandler = (data) => {
           if (data.videoId === videoId) {
+            cleanup();
             setUploading(false);
             setError('Video processing failed');
             setUploadProgress(0);
             setProcessingProgress(0);
             setCurrentVideoId(null);
             
-            // Clean up listeners
             socket.off('video:processing', processingHandler);
             socket.off('video:completed', completedHandler);
             socket.off('video:failed', failedHandler);
@@ -124,14 +169,33 @@ export function VideoUpload() {
         socket.on('video:processing', processingHandler);
         socket.on('video:completed', completedHandler);
         socket.on('video:failed', failedHandler);
+      } else {
+        pollingIntervalRef.current = setInterval(checkVideoStatus, 2000);
       }
     } catch (err) {
       setUploading(false);
       setError(err.response?.data?.error || 'Upload failed');
       setUploadProgress(0);
       setProcessingProgress(0);
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+      if (socket && currentVideoId) {
+        socket.off('video:processing');
+        socket.off('video:completed');
+        socket.off('video:failed');
+      }
+    };
+  }, [socket, currentVideoId]);
 
   if (!user || (user.role !== 'editor' && user.role !== 'admin')) {
     return null;

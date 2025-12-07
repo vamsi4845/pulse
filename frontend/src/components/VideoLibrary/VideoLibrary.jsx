@@ -16,6 +16,13 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { cn } from '../../lib/utils.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select.jsx';
 
 const StatusBadge = ({ status, type = 'status' }) => {
   const styles = {
@@ -56,7 +63,12 @@ export function VideoLibrary() {
     sensitivityStatus: '',
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const { videos, loading, error, pagination, fetchVideos } = useVideos(filters);
+  const [page, setPage] = useState(1);
+  const { videos, loading, error, pagination, fetchVideos } = useVideos(filters, page);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters.status, filters.sensitivityStatus]);
 
   const filteredVideos = videos.filter((video) => {
     if (searchTerm) {
@@ -94,33 +106,43 @@ export function VideoLibrary() {
             />
           </div>
           
-          <div className="flex gap-3">
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <select
-                value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                className="pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <option value="">All Status</option>
-                <option value={VIDEO_STATUS.UPLOADING}>Uploading</option>
-                <option value={VIDEO_STATUS.PROCESSING}>Processing</option>
-                <option value={VIDEO_STATUS.COMPLETED}>Completed</option>
-                <option value={VIDEO_STATUS.FAILED}>Failed</option>
-              </select>
-            </div>
-
-            <select
-              value={filters.sensitivityStatus}
-              onChange={(e) =>
-                setFilters({ ...filters, sensitivityStatus: e.target.value })
-              }
-              className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer hover:bg-gray-50 transition-colors"
+          <div className="flex gap-2">
+            <Select
+              value={filters.status || 'all'}
+              onValueChange={(value) => {
+                setFilters({ ...filters, status: value === 'all' ? '' : value });
+                setPage(1);
+              }}
             >
-              <option value="">All Sensitivity</option>
-              <option value={SENSITIVITY_STATUS.SAFE}>Safe</option>
-              <option value={SENSITIVITY_STATUS.FLAGGED}>Flagged</option>
-            </select>
+              <SelectTrigger className="w-[140px] pl-9">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value={VIDEO_STATUS.UPLOADING}>Uploading</SelectItem>
+                <SelectItem value={VIDEO_STATUS.PROCESSING}>Processing</SelectItem>
+                <SelectItem value={VIDEO_STATUS.COMPLETED}>Completed</SelectItem>
+                <SelectItem value={VIDEO_STATUS.FAILED}>Failed</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.sensitivityStatus || 'all'}
+              onValueChange={(value) => {
+                setFilters({ ...filters, sensitivityStatus: value === 'all' ? '' : value });
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sensitivity</SelectItem>
+                <SelectItem value={SENSITIVITY_STATUS.SAFE}>Safe</SelectItem>
+                <SelectItem value={SENSITIVITY_STATUS.FLAGGED}>Flagged</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>
@@ -226,7 +248,7 @@ export function VideoLibrary() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => fetchVideos(pagination.page - 1)}
+              onClick={() => setPage(pagination.page - 1)}
               disabled={pagination.page === 1}
               className="p-2 border border-gray-200 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title="Previous Page"
@@ -234,7 +256,7 @@ export function VideoLibrary() {
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
-              onClick={() => fetchVideos(pagination.page + 1)}
+              onClick={() => setPage(pagination.page + 1)}
               disabled={pagination.page === pagination.pages}
               className="p-2 border border-gray-200 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title="Next Page"
