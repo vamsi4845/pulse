@@ -9,37 +9,82 @@ export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
 
   useEffect(() => {
-    if (isAuthenticated && user && !socketRef.current) {
-      const newSocket = createSocket(
-        user.id,
-        user.organizationId
-      );
-
-      newSocket.on('connect', () => {
-        setConnected(true);
-      });
-
-      newSocket.on('disconnect', () => {
-        setConnected(false);
-      });
-
-      newSocket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
-        setConnected(false);
-      });
-
-      socketRef.current = newSocket;
-      setSocket(newSocket);
-    }
-
-    return () => {
+    if (!isAuthenticated || !user) {
       if (socketRef.current) {
+        socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
         socketRef.current = null;
         setSocket(null);
         setConnected(false);
+        reconnectAttemptsRef.current = 0;
+      }
+      return;
+    }
+
+    if (socketRef.current?.connected) {
+      return;
+    }
+
+    if (socketRef.current && !socketRef.current.connected) {
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
+    const newSocket = createSocket(
+      user.id,
+      user.organizationId
+    );
+
+    const handleConnect = () => {
+      console.log('Socket connected');
+      setConnected(true);
+      reconnectAttemptsRef.current = 0;
+    };
+
+    const handleDisconnect = (reason) => {
+      console.log('Socket disconnected:', reason);
+      setConnected(false);
+      
+      if (reason === 'io server disconnect') {
+        newSocket.connect();
+      }
+    };
+
+    const handleConnectError = (error) => {
+      reconnectAttemptsRef.current += 1;
+      console.error('Socket connection error:', error.message);
+      setConnected(false);
+      
+      if (error.message.includes('Invalid namespace') || 
+          error.message.includes('Authentication') ||
+          reconnectAttemptsRef.current >= 3) {
+        console.log('Stopping socket reconnection attempts');
+        newSocket.disconnect();
+        socketRef.current = null;
+        setSocket(null);
+        reconnectAttemptsRef.current = 0;
+      }
+    };
+
+    newSocket.on('connect', handleConnect);
+    newSocket.on('disconnect', handleDisconnect);
+    newSocket.on('connect_error', handleConnectError);
+
+    socketRef.current = newSocket;
+    setSocket(newSocket);
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.removeAllListeners();
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setSocket(null);
+        setConnected(false);
+        reconnectAttemptsRef.current = 0;
       }
     };
   }, [isAuthenticated, user]);

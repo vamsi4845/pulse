@@ -9,6 +9,13 @@ export function createSocket(userId, organizationId) {
     },
     withCredentials: true,
     transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 5,
+    timeout: 20000,
+    forceNew: false,
+    autoConnect: true,
   });
 }
 

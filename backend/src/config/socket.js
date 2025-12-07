@@ -24,37 +24,56 @@ export function initializeSocket(server) {
   });
 
   io.use(async (socket, next) => {
-    let token = socket.handshake.auth.token;
-    
-    if (!token) {
-      const cookieHeader = socket.handshake.headers.cookie;
-      const cookies = parseCookies(cookieHeader);
-      token = cookies.token;
-    }
-    
-    if (!token) {
-      return next(new Error('Authentication error: No token provided'));
-    }
-    
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      socket.userId = decoded.id.toString();
+      let token = socket.handshake.auth.token;
       
-      const { User } = await import('../models/User.js');
-      const user = await User.findById(decoded.id).select('organizationId');
-      
-      if (user && user.organizationId) {
-        socket.organizationId = user.organizationId.toString();
+      if (!token) {
+        const cookieHeader = socket.handshake.headers.cookie;
+        if (cookieHeader) {
+          const cookies = parseCookies(cookieHeader);
+          token = cookies.token;
+        }
       }
       
-      next();
+      if (!token) {
+        const error = new Error('Authentication error: No token provided');
+        error.data = { type: 'AUTH_ERROR' };
+        return next(error);
+      }
+      
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        socket.userId = decoded.id.toString();
+        
+        const { User } = await import('../models/User.js');
+        const user = await User.findById(decoded.id).select('organizationId');
+        
+        if (user && user.organizationId) {
+          socket.organizationId = user.organizationId.toString();
+        }
+        
+        next();
+      } catch (jwtError) {
+        console.error('Socket JWT verification error:', jwtError.message);
+        const error = new Error('Authentication error: Invalid token');
+        error.data = { type: 'AUTH_ERROR' };
+        next(error);
+      }
     } catch (error) {
-      console.error('Socket authentication error:', error);
-      next(new Error('Authentication error: Invalid token'));
+      console.error('Socket middleware error:', error);
+      const authError = new Error('Authentication error: Failed to authenticate');
+      authError.data = { type: 'AUTH_ERROR' };
+      next(authError);
     }
   });
 
   io.on('connection', (socket) => {
+    if (!socket.userId) {
+      console.error('Socket connected without userId');
+      socket.disconnect();
+      return;
+    }
+
     console.log(`User connected: ${socket.userId}`);
     
     if (socket.organizationId) {
@@ -62,9 +81,17 @@ export function initializeSocket(server) {
     }
     socket.join(`user:${socket.userId}`);
 
-    socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.userId}`);
+    socket.on('disconnect', (reason) => {
+      console.log(`User disconnected: ${socket.userId}, reason: ${reason}`);
     });
+
+    socket.on('error', (error) => {
+      console.error(`Socket error for user ${socket.userId}:`, error);
+    });
+  });
+
+  io.engine.on('connection_error', (err) => {
+    console.error('Socket.IO connection error:', err);
   });
 
   return io;
