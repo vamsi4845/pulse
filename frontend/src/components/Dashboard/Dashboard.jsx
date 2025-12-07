@@ -89,7 +89,10 @@ export function Dashboard() {
               <div className="bg-indigo-600 p-2 rounded-lg">
                 <LayoutDashboard className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Pulse <span className="text-indigo-600 hidden md:block">Video</span></h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Pulse</h1>
+                <h1 className="text-xl font-bold hidden md:block tracking-tight">Video</h1>
+              </div>
             </div>
             
             <div className="flex items-center gap-6">
