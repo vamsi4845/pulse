@@ -1,5 +1,6 @@
 import { Video } from '../models/Video.js';
 import { logInfo, logError } from '../utils/logger.js';
+import { moderateVideo } from './contentModeration.js';
 
 export async function processVideo(videoId, io) {
   try {
@@ -19,14 +20,12 @@ export async function processVideo(videoId, io) {
       status: 'processing',
     });
 
-    const processingTime = 5000 + Math.random() * 10000;
-    const steps = 10;
-    const stepTime = processingTime / steps;
-
-    for (let i = 1; i <= steps; i++) {
-      await new Promise((resolve) => setTimeout(resolve, stepTime));
+    const processingSteps = 8;
+    
+    for (let i = 1; i <= processingSteps; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       
-      const progress = Math.round((i / steps) * 100);
+      const progress = Math.round((i / processingSteps) * 80);
       
       await Video.findByIdAndUpdate(videoId, {
         processingProgress: progress,
@@ -39,7 +38,14 @@ export async function processVideo(videoId, io) {
       });
     }
 
-    const sensitivityStatus = Math.random() < 0.7 ? 'safe' : 'flagged';
+    io.to(`user:${video.userId}`).emit('video:processing', {
+      videoId: video._id.toString(),
+      progress: 85,
+      status: 'processing',
+      message: 'Analyzing content...',
+    });
+
+    const sensitivityStatus = await moderateVideo(video.s3Key, video._id.toString(), video.userId.toString(), io);
 
     await Video.findByIdAndUpdate(videoId, {
       status: 'completed',

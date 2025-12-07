@@ -98,6 +98,11 @@ AWS_S3_BUCKET=your-bucket-name
 PORT=5000
 FRONTEND_URL=http://localhost:5173
 NODE_ENV=development
+
+# Optional: AWS Rekognition settings (defaults work fine)
+REKOGNITION_MIN_CONFIDENCE=50
+REKOGNITION_POLL_INTERVAL=5000
+REKOGNITION_MAX_POLL_ATTEMPTS=120
 ```
 
 5. Start the backend server:
@@ -345,13 +350,46 @@ Delete a video (Editor/Admin only).
   ```
 - `video:failed`: Emitted when processing fails
 
-## Video Processing
+## Video Processing & Content Moderation
 
-The application includes a mock sensitivity analysis service that:
-- Simulates processing time (5-15 seconds)
-- Randomly classifies videos as "safe" (70%) or "flagged" (30%)
+The application includes AI-powered content moderation using AWS Rekognition:
+- Analyzes videos directly from S3 (no download or frame extraction needed)
+- Uses AWS Rekognition Video Content Moderation API
+- Classifies videos as "safe" or "flagged" based on content analysis
 - Provides real-time progress updates (0-100%)
 - Updates video status in the database
+
+### Content Moderation Setup
+
+**AWS Rekognition is already configured** using your existing AWS credentials!
+
+**Free Tier:**
+- First 5,000 minutes of video analyzed per month — **FREE**
+- After that: ~$0.10 per minute
+
+**Optional Environment Variables** (in `.env`):
+```env
+# AWS credentials (already configured for S3)
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+AWS_REGION=us-east-1
+
+# Rekognition settings (optional, defaults shown)
+REKOGNITION_MIN_CONFIDENCE=50        # Minimum confidence % (0-100)
+REKOGNITION_POLL_INTERVAL=5000        # Poll interval in ms
+REKOGNITION_MAX_POLL_ATTEMPTS=120     # Max polling attempts (~10 minutes)
+
+# Optional: SNS notifications for async processing
+REKOGNITION_SNS_TOPIC_ARN=arn:aws:sns:...
+REKOGNITION_ROLE_ARN=arn:aws:iam::...
+```
+
+**How it works:**
+- Videos are analyzed directly from S3 (no download needed)
+- Rekognition processes the entire video for comprehensive analysis
+- Results are returned with confidence scores
+- Videos are flagged if explicit content is detected above the confidence threshold
+- Falls back to "safe" if moderation fails (graceful degradation)
 
 ## Multi-Tenant Architecture
 
@@ -467,14 +505,15 @@ Basic testing can be performed by:
 
 ## Future Enhancements
 
-- Real video processing with FFmpeg
-- Integration with AWS Rekognition for actual content analysis
+- ✅ AI-powered content moderation (implemented with AWS Rekognition)
 - Video thumbnail generation
 - Multiple video quality options
 - User management interface for admins
 - Email notifications
 - Video comments and ratings
 - Advanced analytics dashboard
+- Admin review queue for flagged videos
+- Appeal system for flagged content
 
 ## License
 
