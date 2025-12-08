@@ -2,8 +2,7 @@ name: Keep Railway Backend Alive
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # Runs every 5 minutes
-  workflow_dispatch:       # Allows manual trigger
+    - cron: "*/5 * * * *"   # every 5 minutes
 
 jobs:
   ping-backend:
@@ -13,4 +12,4 @@ jobs:
       - name: Ping Backend API
         run: |
           echo "Pinging backend..."
-          curl -X GET https://pulse-35r9.onrender.com/health || echo "Ping failed"
+          curl -fsS https://YOUR_BACKEND_URL_HERE || echo "Ping failed"
