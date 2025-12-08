@@ -12,4 +12,4 @@ jobs:
       - name: Ping Backend API
         run: |
           echo "Pinging backend..."
-          curl -fsS https://YOUR_BACKEND_URL_HERE || echo "Ping failed"
+          curl -fsS https://pulse-35r9.onrender.com/health || echo "Ping failed"
