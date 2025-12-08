@@ -115,7 +115,6 @@ export function VideoLibrary() {
               }}
             >
               <SelectTrigger className="w-[140px] pl-9">
-                <Filter className="" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
