@@ -114,7 +114,7 @@ export function VideoLibrary() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-[140px] pl-9">
+              <SelectTrigger className="w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
